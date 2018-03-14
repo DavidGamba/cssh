@@ -57,7 +57,6 @@ func main() {
 	common.Debug(passwords)
 
 	command := []string{}
-	command = append(command, remaining...)
 	if opt.Called("key") {
 		keys := common.GetKeyList()
 		if keyIndex == -1 {
@@ -69,6 +68,7 @@ func main() {
 		command = append(command, "-i")
 		command = append(command, keys[keyIndex])
 	}
+	command = append(command, remaining...)
 
 	child, _ := gexpect.NewSubProcess("ssh", command...)
 	common.Debug("ssh", command)
