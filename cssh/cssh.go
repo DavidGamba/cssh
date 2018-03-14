@@ -36,7 +36,7 @@ func main() {
 	opt.Bool("help", false)
 	opt.IntVarOptional(&keyIndex, "key", -1)
 	opt.BoolVar(&common.DebugFlag, "debug", false)
-	opt.IntVar(&timeoutSeconds, "timeout", 15)
+	opt.IntVar(&timeoutSeconds, "timeout", 5)
 	remaining, err := opt.Parse(os.Args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
@@ -80,7 +80,11 @@ func main() {
 	// 	child.Echo()
 	// }
 
-	common.SSHLogin(child, time.Duration(timeoutSeconds), passwords)
+	err = common.SSHLogin(child, time.Duration(timeoutSeconds)*time.Second, passwords)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 	child.SendLine("set -o vi")
 	child.InteractTimeout(0)
 }

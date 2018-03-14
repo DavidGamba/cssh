@@ -43,7 +43,7 @@ func Debugf(format string, a ...interface{}) {
 func SSHLogin(child *gexpect.SubProcess, timeout time.Duration, passwords []string) error {
 	Debug("sshLogin")
 	idx, err := child.ExpectTimeout(
-		timeout*time.Second,
+		timeout,
 		regexp.MustCompile(`no\)\?\s`),
 		regexp.MustCompile(`(?i:password:)\s*\r?\n?`),
 		regexp.MustCompile(`~|>`),
