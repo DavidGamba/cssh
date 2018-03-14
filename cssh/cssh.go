@@ -16,10 +16,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/davidgamba/cssh/common"
-	"github.com/davidgamba/gexpect"
+	"github.com/DavidGamba/cssh/common"
+	"github.com/DavidGamba/gexpect"
 	// "github.com/shavac/gexpect"
-	"github.com/davidgamba/go-getoptions"
+	"github.com/DavidGamba/go-getoptions"
 )
 
 func synopsis() {

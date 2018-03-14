@@ -18,7 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davidgamba/gexpect"
+	"github.com/DavidGamba/gexpect"
 	// "github.com/shavac/gexpect"
 )
 
