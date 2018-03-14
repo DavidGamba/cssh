@@ -39,14 +39,25 @@ func Debugf(format string, a ...interface{}) {
 	}
 }
 
+
+
 // SSHLogin - Excecute interactive ssh login
 func SSHLogin(child *gexpect.SubProcess, timeout time.Duration, passwords []string) error {
 	Debug("sshLogin")
 	idx, err := child.ExpectTimeout(
 		timeout,
+		// yes / no question
 		regexp.MustCompile(`no\)\?\s`),
+		// password
 		regexp.MustCompile(`(?i:password:)\s*\r?\n?`),
+		// Valid terminal session
 		regexp.MustCompile(`~|>`),
+		// SCP number% found
+		regexp.MustCompile(`\s\d+%\s`),
+		// Permission denied
+		regexp.MustCompile(`Permission denied`),
+		// Connection refused
+		regexp.MustCompile(`connect to host \S+ port \d+: Connection refused`),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", child.Before)
@@ -71,14 +82,20 @@ func SSHLogin(child *gexpect.SubProcess, timeout time.Duration, passwords []stri
 			child.SendLine(passwords[0])
 			return SSHLogin(child, timeout, passwords[1:])
 		case 2:
-			Debug("done")
+			Debug("ssh login")
 			return nil
+		case 3:
+			Debug("scp transfer")
+			return nil
+		case 4, 5:
+			Debug("Error")
+			return fmt.Errorf("Error: %s%s%s\n", child.Before, child.Match, child.After)
 		default:
-			Debug("ups!")
+			Debug("Unknown index")
 			return nil
 		}
 	}
-	Debug("error")
+	Debug("Error with index return")
 	return nil // FIXME
 }
 
