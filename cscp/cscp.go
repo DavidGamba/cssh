@@ -33,7 +33,7 @@ func main() {
 	var timeoutSeconds int
 	var keyIndex int
 	opt := getoptions.New()
-	opt.SetUnknownMode("pass")
+	opt.SetUnknownMode(getoptions.Pass)
 	opt.Bool("help", false)
 	opt.IntVarOptional(&keyIndex, "key", -1)
 	opt.BoolVar(&common.DebugFlag, "debug", false)
