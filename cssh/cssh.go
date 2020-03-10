@@ -13,14 +13,23 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"io/ioutil"
+	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/DavidGamba/cssh/common"
-	"github.com/DavidGamba/gexpect"
+	"golang.org/x/crypto/ssh/terminal"
+
+	// "github.com/DavidGamba/gexpect"
 	// "github.com/shavac/gexpect"
 	"github.com/DavidGamba/go-getoptions"
 )
+
+var logger *log.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
 
 func synopsis() {
 	synopsis := `cssh <hostname> [--timeout <seconds>] [--key [<key-index>]] [--debug] [SSH Options...]
@@ -39,14 +48,17 @@ func main() {
 	opt.BoolVar(&common.DebugFlag, "debug", false)
 	opt.IntVar(&timeoutSeconds, "timeout", 5)
 	remaining, err := opt.Parse(os.Args[1:])
+	if opt.Called("help") {
+		synopsis()
+		os.Exit(1)
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
-
-	if opt.Called("help") {
-		synopsis()
-		os.Exit(1)
+	if opt.Called("debug") {
+		logger.SetOutput(os.Stderr)
+		common.SetLogger(logger)
 	}
 
 	if len(remaining) < 1 {
@@ -57,7 +69,7 @@ func main() {
 	passwords := common.ReadConfig(remaining[0])
 	common.Debug(passwords)
 
-	command := []string{}
+	var key string
 	if opt.Called("key") {
 		keys := common.GetKeyList()
 		if keyIndex == -1 {
@@ -66,26 +78,81 @@ func main() {
 			}
 			os.Exit(1)
 		}
-		command = append(command, "-i")
-		command = append(command, keys[keyIndex])
+		key = keys[keyIndex]
 	}
-	command = append(command, remaining...)
-
-	child, _ := gexpect.NewSubProcess("ssh", command...)
-	common.Debug("ssh", command)
-	if err := child.Start(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-	}
-	defer child.Close()
-	// if debugFlag {
-	// 	child.Echo()
-	// }
-
-	err = common.SSHLogin(child, time.Duration(timeoutSeconds)*time.Second, passwords)
+	err = sshRun(time.Duration(300)*time.Second, key, remaining[0], "ubuntu")
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
 		os.Exit(1)
 	}
-	child.SendLine("set -o vi")
-	child.InteractTimeout(0)
+}
+
+func sshRun(sshTimeout time.Duration, key, host, user string) error {
+	logger.Printf("sshRun %v, %s %s %s\n", sshTimeout, key, host, user)
+	signer, err := common.UnlockPrivateKey(key)
+	if err != nil {
+		return fmt.Errorf("ERROR: failed to unlock private key '%s' %w\n", key, err)
+	}
+	client, err := common.SSHClient(sshTimeout, signer, user, host)
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	session, err := common.SSHSession(client, host)
+	if err != nil {
+		return fmt.Errorf("failed to create ssh session to '%s': %w", host, err)
+	}
+	defer session.Close()
+	session.Stdout = os.Stdout
+	session.Stderr = os.Stderr
+	// session.Stdin = os.Stdin
+	stdin, _ := session.StdinPipe()
+	go func() {
+		io.Copy(stdin, os.Stdin)
+	}()
+	err = session.Shell()
+	if err != nil {
+		return err
+	}
+
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGWINCH, os.Interrupt)
+	go func() {
+		for {
+			switch <-signals {
+			case syscall.SIGWINCH:
+				fd := int(os.Stdout.Fd())
+				w, h, _ := terminal.GetSize(fd)
+				session.WindowChange(h, w)
+			case os.Interrupt:
+				stdin.Write([]byte("\x03"))
+				// // Doesn't work
+				// // fmt.Println("^C")
+				// // fmt.Fprint(os.Stdin, "\n")
+				//
+				// // Doesn't work
+				// // stdin.Write([]byte("^C\n"))
+				//
+				// // Doesn't work
+				// // stdin.Write([]byte("^C"))
+				//
+				// // Doesn't work
+				// // fmt.Fprint(stdin, "\x03")
+				//
+				// // Doesn't work
+				// err := session.Signal(ssh.SIGINT)
+				// if err != nil {
+				// 	fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
+				// }
+				// fmt.Println("\nSignal sent")
+			}
+		}
+	}()
+
+	err = session.Wait()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
