@@ -62,7 +62,7 @@ func main() {
 		keys := common.GetKeyList()
 		if keyIndex == -1 {
 			for i, v := range keys {
-				fmt.Fprintf(os.Stderr, "%d: %s\n", i, v)
+				fmt.Fprintf(os.Stderr, "%d: %s :%d\n", i, v, i)
 			}
 			os.Exit(1)
 		}
